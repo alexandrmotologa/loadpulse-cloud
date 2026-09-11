@@ -1,0 +1,22 @@
+services:
+  loadpulse-cloud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loadpulse-cloud
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-mock_token}
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - WEB_APP_URL=${WEB_APP_URL:-}
+      - DATA_DIR=/app/server/data
+      - MAX_CONCURRENCY=100
+      - MAX_DURATION_SEC=30
+    volumes:
+      - loadpulse_data:/app/server/data
+
+volumes:
+  loadpulse_data:
