@@ -9,12 +9,15 @@ import {
   StopCircle,
   AlertCircle,
   CheckCircle2,
+  GitCompare,
 } from 'lucide-react';
 import { useTelegram } from './hooks/useTelegram';
 import { useLiveBenchmark } from './hooks/useLiveBenchmark';
 import { LiveGauge } from './components/LiveGauge';
 import { PercentileCurve } from './components/PercentileCurve';
 import { StatusBreakdown } from './components/StatusBreakdown';
+import { StreamingChart } from './components/StreamingChart';
+import { ErrorDrilldown } from './components/ErrorDrilldown';
 import { BenchConfigModal } from './components/BenchConfigModal';
 import { HistoryList } from './components/HistoryList';
 import { ReportExportModal } from './components/ReportExportModal';
@@ -35,7 +38,7 @@ export function App() {
     reset,
   } = useLiveBenchmark();
 
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'config' | 'history' | 'about'>('config');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'config' | 'history'>('config');
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Check URL params for benchmark ID (e.g. from Telegram WebApp button)
@@ -78,6 +81,8 @@ export function App() {
     report?.rpsPeak || 0
   );
   const activeWorkers = activeConfig?.concurrency || report?.concurrency || 0;
+  const durationSec = activeConfig?.durationSec || report?.durationSec || 10;
+  const activeProfile = activeConfig?.loadProfile || report?.loadProfile || 'flat';
 
   return (
     <div className="min-h-screen bg-dark-base flex flex-col text-slate-100">
@@ -92,7 +97,7 @@ export function App() {
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-tight text-white">LoadPulse Cloud</h1>
                 <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-pulse-500/10 text-pulse-400 border border-pulse-500/30">
-                  v1.0
+                  v1.2 PRO
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">Telegram Load Testing Cockpit</p>
@@ -161,7 +166,7 @@ export function App() {
             }`}
           >
             <HistoryIcon className="w-3.5 h-3.5" />
-            History
+            History & Diff
           </button>
         </div>
       </header>
@@ -194,6 +199,9 @@ export function App() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">
                     Target URL
+                  </span>
+                  <span className="text-[10px] font-mono uppercase bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                    {activeProfile} profile
                   </span>
                   {status === 'running' && (
                     <span className="flex items-center gap-1 text-[10px] font-mono bg-pulse-500/20 text-pulse-400 px-2 py-0.5 rounded-full animate-pulse">
@@ -247,6 +255,7 @@ export function App() {
                   <PercentileCurve
                     stats={report.latencies}
                     points={report.percentilePoints}
+                    sloResult={report.sloResult}
                   />
                 ) : latestTick ? (
                   <div className="glass-card p-5 rounded-2xl flex flex-col gap-3">
@@ -255,7 +264,7 @@ export function App() {
                         Running Progress
                       </h3>
                       <span className="text-xs font-mono text-pulse-400">
-                        {latestTick.elapsedSec}s / {activeConfig?.durationSec}s
+                        {latestTick.elapsedSec}s / {durationSec}s
                       </span>
                     </div>
 
@@ -265,7 +274,7 @@ export function App() {
                         style={{
                           width: `${Math.min(
                             100,
-                            (latestTick.elapsedSec / (activeConfig?.durationSec || 10)) * 100
+                            (latestTick.elapsedSec / durationSec) * 100
                           )}%`,
                         }}
                         className="h-full bg-gradient-to-r from-pulse-500 to-amber-400 transition-all duration-300"
@@ -315,6 +324,19 @@ export function App() {
                 )}
               </div>
             </div>
+
+            {/* Live Streaming Chart (Time-Series) */}
+            {ticks.length > 0 && (
+              <StreamingChart ticks={ticks} durationSec={durationSec} />
+            )}
+
+            {/* Error Drilldown if failures occurred */}
+            {report && report.failedRequests > 0 && (
+              <ErrorDrilldown
+                statusCodes={report.statusCodes}
+                totalRequests={report.totalRequests}
+              />
+            )}
           </div>
         )}
 

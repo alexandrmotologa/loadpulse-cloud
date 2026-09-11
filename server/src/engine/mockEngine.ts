@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { nanoid } from 'nanoid';
-import { BenchmarkConfig, BenchmarkReport, BenchmarkTick } from '../types';
+import { BenchmarkConfig, BenchmarkReport, BenchmarkTick, LoadProfile, SloResult } from '../types';
 import { LatencyHistogram } from './histogram';
 import { historyStore } from '../storage/historyStore';
 
@@ -43,8 +43,8 @@ export class MockEngine extends EventEmitter {
     let failedRequests = 0;
     let rpsPeak = 0;
 
-    // Target RPS simulation based on concurrency (e.g. 50-1200 RPS)
-    const baseRps = Math.min(1500, Math.max(80, this.config.concurrency * 35));
+    const loadProfile: LoadProfile = this.config.loadProfile || 'flat';
+    const targetConcurrency = this.config.concurrency;
 
     this.emit('started', { id: this.id, config: this.config });
 
@@ -59,9 +59,35 @@ export class MockEngine extends EventEmitter {
 
       elapsedMs += tickFrequencyMs;
       const elapsedSec = Math.round((elapsedMs / 1000) * 10) / 10;
+      const progressRatio = Math.min(1, elapsedMs / durationMs);
 
-      // Add a slight realistic fluctuation to RPS (+/- 15%)
-      const fluctuation = 1 + (Math.sin(elapsedMs / 1000) * 0.12) + ((Math.random() - 0.5) * 0.08);
+      // Compute dynamic concurrency based on load profile
+      let activeConcurrency = targetConcurrency;
+      if (loadProfile === 'ramp-up') {
+        if (progressRatio < 0.3) {
+          activeConcurrency = Math.max(1, Math.round(targetConcurrency * (progressRatio / 0.3)));
+        } else if (progressRatio > 0.8) {
+          activeConcurrency = Math.max(1, Math.round(targetConcurrency * ((1 - progressRatio) / 0.2)));
+        }
+      } else if (loadProfile === 'spike') {
+        if (progressRatio >= 0.45 && progressRatio <= 0.65) {
+          activeConcurrency = targetConcurrency;
+        } else {
+          activeConcurrency = Math.max(1, Math.round(targetConcurrency * 0.25));
+        }
+      } else if (loadProfile === 'step') {
+        if (progressRatio < 0.33) {
+          activeConcurrency = Math.max(1, Math.round(targetConcurrency * 0.33));
+        } else if (progressRatio < 0.66) {
+          activeConcurrency = Math.max(1, Math.round(targetConcurrency * 0.66));
+        } else {
+          activeConcurrency = targetConcurrency;
+        }
+      }
+
+      // Base RPS scales with active concurrency
+      const baseRps = Math.min(1800, Math.max(40, activeConcurrency * 35));
+      const fluctuation = 1 + Math.sin(elapsedMs / 1000) * 0.1 + (Math.random() - 0.5) * 0.08;
       const instantRps = Math.round(baseRps * fluctuation);
       if (instantRps > rpsPeak) rpsPeak = instantRps;
 
@@ -70,23 +96,22 @@ export class MockEngine extends EventEmitter {
 
       for (let i = 0; i < requestsThisTick; i++) {
         // Gaussian distributed latency
-        // Box-Muller transform
         const u = 1 - Math.random();
         const v = Math.random();
         const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-        
-        let latency = 18 + z * 6; // median around 18ms
-        
-        // 2% chance of tail latency spike
+
+        // Latency slightly increases under heavy spike load
+        const loadFactor = activeConcurrency / targetConcurrency;
+        let latency = 16 + loadFactor * 4 + z * 5;
+
         if (Math.random() < 0.02) {
-          latency += 50 + Math.random() * 150;
+          latency += 60 + Math.random() * 120;
         }
         latency = Math.max(4, latency);
 
         this.histogram.record(latency);
         totalRequests++;
 
-        // Status code distribution: 98.8% 200, 0.8% 429, 0.4% 500
         const rand = Math.random();
         if (rand > 0.996) {
           statusCodes['500']++;
@@ -110,18 +135,45 @@ export class MockEngine extends EventEmitter {
         totalRequests,
         successfulRequests,
         failedRequests,
-        activeWorkers: this.config.concurrency,
+        activeWorkers: activeConcurrency,
       };
 
       ticks.push(tick);
       this.emit('tick', tick);
 
-      // Check if finished
       if (elapsedMs >= durationMs) {
         this.cleanup();
         const endTime = new Date();
         const durationActualMs = endTime.getTime() - startTimeMs;
         const rpsMean = Math.round((totalRequests / (durationActualMs / 1000)) * 10) / 10;
+
+        // Evaluate SLO assertions if provided
+        let sloResult: SloResult | undefined;
+        if (this.config.slo) {
+          const breaches: string[] = [];
+          const p95Val = this.histogram.getPercentile(95);
+
+          if (this.config.slo.maxP95Ms !== undefined && p95Val > this.config.slo.maxP95Ms) {
+            breaches.push(`p95 latency was ${p95Val}ms (target: <= ${this.config.slo.maxP95Ms}ms)`);
+          }
+
+          const errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+          if (
+            this.config.slo.maxErrorRatePercent !== undefined &&
+            errorRate > this.config.slo.maxErrorRatePercent
+          ) {
+            breaches.push(`Error rate was ${errorRate.toFixed(1)}% (target: <= ${this.config.slo.maxErrorRatePercent}%)`);
+          }
+
+          if (this.config.slo.minRps !== undefined && rpsMean < this.config.slo.minRps) {
+            breaches.push(`Average throughput was ${rpsMean} req/s (target: >= ${this.config.slo.minRps} req/s)`);
+          }
+
+          sloResult = {
+            passed: breaches.length === 0,
+            breaches,
+          };
+        }
 
         const report: BenchmarkReport = {
           id: this.id,
@@ -129,6 +181,7 @@ export class MockEngine extends EventEmitter {
           method: this.config.method || 'GET',
           concurrency: this.config.concurrency,
           durationSec: this.config.durationSec,
+          loadProfile,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           durationActualMs,
@@ -141,6 +194,8 @@ export class MockEngine extends EventEmitter {
           statusCodes,
           percentilePoints: this.histogram.getPercentileCurve(),
           ticks,
+          slo: this.config.slo,
+          sloResult,
           isDemo: true,
         };
 

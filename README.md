@@ -47,8 +47,12 @@ LoadPulse Cloud is the official Telegram companion and mobile control station fo
 
 ## Highlights
 
-- **Telegram Bot Control:** Trigger tests with `/bench <url> [concurrency] [duration]` and watch live status edits throttled at 1.5-second intervals.
-- **Telegram Mini App Cockpit:** Launch an interactive mobile dashboard with an SVG throughput gauge, streaming latency charts, and percentile curves.
+- **Telegram Bot Control:** Trigger tests with `/bench <url> [concurrency] [duration]` and watch live status edits throttled at 1.5-second intervals. Run pre-flight health diagnostics with `/probe <url>`.
+- **Advanced Load Traffic Profiles:** Choose between Constant (Flat), Ramp-Up (gradual virtual user scaling), Spike Burst (shockwave traffic testing), and Step Tiers (multi-stage load).
+- **SLO Quality Gates:** Enforce performance criteria (max p95 latency, max error rate, min throughput) with automated `PASSED` or `BREACHED` certifications in Telegram and reports.
+- **Pre-flight Diagnostic Probe:** Measure DNS lookup, TLS handshake, and Time to First Byte (TTFB) before launching high-concurrency benchmarks.
+- **Telegram Mini App Cockpit:** Launch an interactive mobile dashboard with an SVG throughput gauge, real-time streaming time-series chart, and percentile curves.
+- **A/B Benchmark Regression Diff:** Select any two historical benchmarks to compute percentage variances and generate GitHub PR-ready Markdown comparison tables.
 - **High Dynamic Range Percentiles:** Calculates exact p50, p75, p90, p95, p99, and p99.9 latencies with `hdr-histogram-js`.
 - **SSRF and Abuse Prevention:** Blocks private IP ranges (RFC 1918, RFC 4193, loopback, link-local, cloud metadata) at DNS resolution time.
 - **Zero-Domain Architecture:** Runs locally on Telegram long polling without public HTTPS webhooks or external domains.
@@ -58,8 +62,8 @@ LoadPulse Cloud is the official Telegram companion and mobile control station fo
 
 LoadPulse Cloud divides duties across two subprojects:
 
-1. **`server/`:** Node.js, TypeScript, and Fastify. Manages the grammY bot instance, SSRF safety guards, Undici connection pools, histogram calculations, and Server-Sent Events (SSE) telemetry.
-2. **`web/`:** React 19, TypeScript, Vite, Tailwind CSS, and Lucide Icons. Provides the touch-friendly Mini App interface with responsive gauges, percentile curves, and benchmark configuration.
+1. **`server/`:** Node.js, TypeScript, and Fastify. Manages the grammY bot instance, pre-flight probe, SSRF safety guards, Undici connection pools, histogram calculations, and Server-Sent Events (SSE) telemetry.
+2. **`web/`:** React, TypeScript, Vite, Tailwind CSS, and Lucide Icons. Provides the touch-friendly Mini App interface with responsive gauges, live streaming charts, A/B diff modals, and benchmark configuration.
 
 ## Telegram Bot Commands
 
@@ -67,6 +71,7 @@ LoadPulse Cloud divides duties across two subprojects:
 | :--- | :--- | :--- |
 | `/start` | None | Welcomes the user, explains usage, and provides quick test shortcuts. |
 | `/bench` | `<url> [concurrency] [duration]` | Starts an on-demand benchmark (e.g. `/bench https://httpbin.org/get 25 10s`). |
+| `/probe` | `<url>` | Runs a single lightweight diagnostic check measuring DNS, TLS, and TTFB. |
 | `/history` | None | Lists recent benchmark runs with one-click report view buttons. |
 | `/stop` | None | Cancels the currently active benchmark in the chat. |
 | `/help` | None | Displays syntax examples, safety parameters, and configuration guidelines. |

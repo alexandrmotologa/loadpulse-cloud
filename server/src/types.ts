@@ -1,3 +1,31 @@
+export type LoadProfile = 'flat' | 'ramp-up' | 'spike' | 'step';
+
+export interface SloCriteria {
+  maxP95Ms?: number;
+  maxErrorRatePercent?: number;
+  minRps?: number;
+}
+
+export interface SloResult {
+  passed: boolean;
+  breaches: string[];
+}
+
+export interface ProbeResult {
+  url: string;
+  statusCode: number;
+  statusText: string;
+  dnsMs: number;
+  tlsMs: number;
+  ttfbMs: number;
+  totalMs: number;
+  ip?: string;
+  serverHeader?: string;
+  contentLength?: number;
+  headers: Record<string, string>;
+  isDemo?: boolean;
+}
+
 export interface BenchmarkConfig {
   id?: string;
   url: string;
@@ -7,6 +35,8 @@ export interface BenchmarkConfig {
   concurrency: number; // 1 - 100
   durationSec: number; // 5 - 30
   timeoutMs?: number;
+  loadProfile?: LoadProfile;
+  slo?: SloCriteria;
 }
 
 export interface LatencyStats {
@@ -46,6 +76,7 @@ export interface BenchmarkReport {
   method: string;
   concurrency: number;
   durationSec: number;
+  loadProfile: LoadProfile;
   startTime: string;
   endTime: string;
   durationActualMs: number;
@@ -58,6 +89,8 @@ export interface BenchmarkReport {
   statusCodes: Record<string, number>;
   percentilePoints: PercentilePoint[];
   ticks: BenchmarkTick[];
+  slo?: SloCriteria;
+  sloResult?: SloResult;
   isDemo?: boolean;
 }
 

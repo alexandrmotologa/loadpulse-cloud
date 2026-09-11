@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { LatencyStats, PercentilePoint } from '../types';
+import { Award } from 'lucide-react';
+import { LatencyStats, PercentilePoint, SloResult } from '../types';
 
 interface PercentileCurveProps {
   stats: LatencyStats;
   points: PercentilePoint[];
+  sloResult?: SloResult;
 }
 
-export const PercentileCurve: React.FC<PercentileCurveProps> = ({ stats, points }) => {
+export const PercentileCurve: React.FC<PercentileCurveProps> = ({ stats, points, sloResult }) => {
   const [hoveredPoint, setHoveredPoint] = useState<PercentilePoint | null>(null);
 
   if (!points || points.length === 0) {
@@ -55,6 +57,27 @@ export const PercentileCurve: React.FC<PercentileCurveProps> = ({ stats, points 
           </span>
         )}
       </div>
+
+      {/* SLO Quality Gate Banner if evaluated */}
+      {sloResult && (
+        <div
+          className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-mono ${
+            sloResult.passed
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+          }`}
+        >
+          <div className="flex items-center gap-2 font-bold">
+            <Award className="w-4 h-4" />
+            <span>SLO Gate: {sloResult.passed ? 'PASSED ✅' : 'BREACHED ❌'}</span>
+          </div>
+          {!sloResult.passed && (
+            <div className="text-[11px] text-rose-300 font-sans">
+              {sloResult.breaches.join(' • ')}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Latency Cards Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">

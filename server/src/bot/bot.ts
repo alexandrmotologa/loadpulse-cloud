@@ -4,6 +4,7 @@ import { handleHelp } from './commands/help';
 import { handleBench } from './commands/bench';
 import { handleHistory } from './commands/history';
 import { handleStop } from './commands/stop';
+import { handleProbe } from './commands/probe';
 
 export class TelegramBotService {
   private bot: Bot | null = null;
@@ -28,6 +29,7 @@ export class TelegramBotService {
       this.bot.command('start', (ctx) => handleStart(ctx, this.webAppUrl));
       this.bot.command('help', (ctx) => handleHelp(ctx));
       this.bot.command('bench', (ctx) => handleBench(this.bot!, ctx, this.webAppUrl));
+      this.bot.command('probe', (ctx) => handleProbe(ctx));
       this.bot.command('history', (ctx) => handleHistory(ctx, this.webAppUrl));
       this.bot.command('stop', (ctx) => handleStop(ctx));
 

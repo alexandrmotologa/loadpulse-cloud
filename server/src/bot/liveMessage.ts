@@ -39,10 +39,14 @@ export class LiveMessageUpdater {
     const progressBar = this.renderProgressBar(progressRatio);
     const progressPercent = Math.round(progressRatio * 100);
 
+    const profileStr = this.config.loadProfile && this.config.loadProfile !== 'flat'
+      ? ` (${this.config.loadProfile.toUpperCase()})`
+      : '';
+
     const text =
       `🚀 *LoadPulse Benchmark in progress...*\n` +
       `🎯 *Target:* \`${this.config.url}\`\n` +
-      `⚙️ *Workers:* ${this.config.concurrency} | *Duration:* ${this.config.durationSec}s\n\n` +
+      `⚙️ *Workers:* ${this.config.concurrency}${profileStr} | *Duration:* ${this.config.durationSec}s\n\n` +
       `📈 *Progress:* \`${progressBar}\` ${progressPercent}% (${tick.elapsedSec.toFixed(1)}s)\n` +
       `⚡ *Throughput:* ${tick.rps.toLocaleString()} req/s | *Total:* ${tick.totalRequests.toLocaleString()} reqs\n` +
       `⏱️ *Latency:* p50: \`${tick.currentP50}ms\` | p95: \`${tick.currentP95}ms\` | p99: \`${tick.currentP99}ms\``;
@@ -58,13 +62,23 @@ export class LiveMessageUpdater {
 
     if (!this.messageId) return;
 
+    let sloSection = '';
+    if (report.sloResult) {
+      if (report.sloResult.passed) {
+        sloSection = `\n🎯 *SLO Status:* ✅ *PASSED* (All targets met)\n`;
+      } else {
+        sloSection = `\n🎯 *SLO Status:* ❌ *BREACHED*\n${report.sloResult.breaches.map((b) => `  ⚠️ ${b}`).join('\n')}\n`;
+      }
+    }
+
     const text =
       `✅ *LoadPulse Benchmark Complete!*\n\n` +
       `🎯 *Target:* \`${report.url}\`\n` +
-      `⚙️ *Workers:* ${report.concurrency} | *Actual Duration:* ${(report.durationActualMs / 1000).toFixed(1)}s\n` +
+      `⚙️ *Profile:* \`${report.loadProfile.toUpperCase()}\` (${report.concurrency} VUs) | *Duration:* ${(report.durationActualMs / 1000).toFixed(1)}s\n` +
       `📦 *Total Requests:* ${report.totalRequests.toLocaleString()} (${report.failedRequests > 0 ? `⚠️ ${report.failedRequests} errors` : '100% OK'})\n` +
-      `⚡ *Throughput:* Mean: \`${report.rpsMean} req/s\` | Peak: \`${report.rpsPeak} req/s\`\n\n` +
-      `📊 *Latency Percentiles:*\n` +
+      `⚡ *Throughput:* Mean: \`${report.rpsMean} req/s\` | Peak: \`${report.rpsPeak} req/s\`\n` +
+      sloSection +
+      `\n📊 *Latency Percentiles:*\n` +
       `  • p50: \`${report.latencies.p50}ms\`\n` +
       `  • p75: \`${report.latencies.p75}ms\`\n` +
       `  • p90: \`${report.latencies.p90}ms\`\n` +
